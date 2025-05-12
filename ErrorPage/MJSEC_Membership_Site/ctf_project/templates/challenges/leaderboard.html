@@ -1,0 +1,139 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scoreboard | MJSEC Membership Site</title>
+  <link rel="icon" href="{% static 'images/favicon.ico' %}">
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      max-width: 1000px;
+      width: 90%;
+      margin: 40px auto;
+      padding: 30px;
+    }
+    h1, h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 2.2em;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 10px;
+    }
+    #leaderboard-graph {
+      width: 100%;
+      height: 400px;
+      margin-bottom: 40px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 40px;
+    }
+    table thead {
+      background: #007bff;
+      color: #fff;
+    }
+    table th, table td {
+      padding: 12px;
+      text-align: left;
+    }
+    table tr:nth-child(even) {
+      background: #f8f9fb;
+    }
+    table tr:hover {
+      background: #e6f2ff;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #1b1616;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .btn:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Scoreboard</h1>
+    <div id="leaderboard-graph"></div>
+
+    <h2>User Rankings</h2>
+    <table id="rankings-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Username</th>
+          <th>Solved</th>
+          <th>Total Points</th>
+          <th>Last Submission</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <a href="{% url 'index' %}" class="btn">Back to Home</a>
+  </div>
+
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script>
+    // UTC → KST 변환
+    function toKST(utc) {
+      const d = new Date(utc);
+      return new Date(d.getTime() + 9*60*60*1000)
+                .toISOString().replace('T',' ').slice(0,19);
+    }
+
+    // 랭킹 테이블 바디 접근자
+    const rankBody = document.querySelector("#rankings-table tbody");
+
+    function updateScoreboard() {
+      fetch("{% url 'challenges:leaderboard_data' %}")
+        .then(r => r.json())
+        .then(data => {
+          // 1) 그래프 업데이트
+          const graph = JSON.parse(data.graph);
+          graph.data.forEach(trace => {
+            trace.x = trace.x.map(toKST);
+          });
+          Plotly.react('leaderboard-graph', graph.data, graph.layout);
+
+          // 2) 사용자 랭킹 테이블 업데이트
+          rankBody.innerHTML = "";
+          data.rankings.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${r[0]}</td>
+              <td>${r[1]}</td>
+              <td>${r[2]}</td>
+              <td>${r[3]}</td>
+              <td>${r[4]}</td>
+            `;
+            rankBody.appendChild(tr);
+          });
+        })
+        .catch(console.error);
+    }
+
+    // 초기 로드 + 1초마다 갱신
+    updateScoreboard();
+    setInterval(updateScoreboard, 1000);
+  </script>
+</body>
+</html>
